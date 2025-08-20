@@ -1,33 +1,33 @@
 #!/bin/bash
 
-# === Настройки ===
+#env
 CONTAINER_NAME="basis-vdi"
 IMAGE_NAME="ghcr.io/vladeffekt/basis-vdi-client:latest"
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 LOG_FILE="$SCRIPT_DIR/basis-vdi-client.log"
 
-# === Функция для вывода в терминал и в лог ===
+#funcion для вывода в терминал и в лог
 log_status() {
     echo "[$(date '+%H:%M:%S')] $1"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
 }
 
-# === Очистка старого лога ===
+#Очистка $LOG_FILE
 echo "========================================" > "$LOG_FILE"
 log_status "Запуск скрипта"
 
-# === Удаляем старый контейнер ===
+#Удаляем старый контейнер
 if docker ps -a -q -f name=^${CONTAINER_NAME}$ | grep -q .; then
     log_status "Остановка старого контейнера"
     docker stop "$CONTAINER_NAME" > /dev/null 2>&1 || true
     docker rm "$CONTAINER_NAME" > /dev/null 2>&1
 fi
 
-# === Разрешить доступ к X-серверу ===
+# Разрешить доступ к X-серверу
 log_status "Разрешение доступа к X-серверу"
 xhost +local:docker > /dev/null 2>&1
 
-# === Получаем DNS-серверы из /etc/resolv.conf ===
+# Получаем DNS-серверы из /etc/resolv.conf
 log_status "Поиск DNS-серверов в /etc/resolv.conf"
 DNS_SERVERS=()
 while IFS= read -r line; do
@@ -48,14 +48,14 @@ if [ ${#DNS_SERVERS[@]} -eq 0 ]; then
     exit 1
 fi
 
-# === Проверка и загрузка образа (с выводом в терминал) ===
+# Проверка и загрузка образа
 log_status "Проверка наличия образа: $IMAGE_NAME"
 
-# Попробуем получить ID образа
+# Пробуем получить ID образа
 IMAGE_ID=$(docker images -q "$IMAGE_NAME" 2>/dev/null)
 
 if [ -n "$IMAGE_ID" ]; then
-    # Образ есть — проверим, можно ли его использовать
+    #Образ есть — проверяем, можно ли его использовать
     if docker inspect "$IMAGE_NAME" >/dev/null 2>&1; then
         log_status "Образ найден локально: $IMAGE_ID"
     else
@@ -75,19 +75,19 @@ else
     fi
 fi
 
-# === Пути ===
+# Пути
 RUNTIME_DIR="/tmp/runtime-vdi"
 AGENT_DIR="/tmp/.basis-vdi"
 mkdir -p "$RUNTIME_DIR" && chmod 700 "$RUNTIME_DIR"
 mkdir -p "$AGENT_DIR" && chmod 777 "$AGENT_DIR"
 
-# === Формируем аргументы --dns ===
+# Формируем --dns аргументы
 DNS_ARGS=""
 for dns in "${DNS_SERVERS[@]}"; do
     DNS_ARGS="$DNS_ARGS --dns $dns"
 done
 
-# === Запуск контейнера в фоне (после полной загрузки) ===
+# Запуск контейнера в фоне
 log_status "Запуск контейнера в фоне: $CONTAINER_NAME"
 
 DOCKER_RUN_CMD="docker run \
@@ -110,10 +110,8 @@ DOCKER_RUN_CMD="docker run \
     exec /opt/vdi-client/bin/desktop-client
   '"
 
-# Запускаем в фоне
 nohup sh -c "$DOCKER_RUN_CMD" >> "$LOG_FILE" 2>&1 &
 
-# === Финальное сообщение (только после загрузки) ===
 echo
 echo "Контейнер '$CONTAINER_NAME' запущен в фоне."
 echo "Логи пишутся в: $LOG_FILE"
